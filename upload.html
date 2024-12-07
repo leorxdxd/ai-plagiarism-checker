@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plagiarism Checker & Paraphraser</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f7f8fa;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            margin-top: 50px;
+            padding: 40px;
+            border-radius: 12px;
+            background-color: #ffffff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+        }
+
+        .btn-custom {
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            border-radius: 5px;
+        }
+
+        .btn-custom:hover {
+            background-color: #218838;
+            transform: scale(1);
+        }
+
+        .form-control {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        label {
+            font-size: 1.1rem;
+            color: #555;
+        }
+
+        .alert {
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+        }
+
+        .output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-size: 1.5rem;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            border-width: 5px;
+        }
+
+        textarea {
+            border-radius: 8px;
+            resize: none;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loadingOverlay">
+        <div>
+            <div class="spinner-border text-light" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <div id="loadingProgress">Loading... 0%</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Plagiarism Checker & Paraphraser</h1>
+
+        <!-- Plagiarism Checking Form -->
+        <form id="plagiarismForm" action="/check" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Upload Your Document (Optional):</label>
+                <input type="file" class="form-control" id="file" name="file">
+            </div>
+
+            <div class="form-group">
+                <label for="text">Or Write Your Text Here (Optional):</label>
+                <textarea class="form-control" id="text" name="text" rows="6">{{ input_text or '' }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-custom mt-3 w-100">Check Plagiarism</button>
+        </form>
+
+        <!-- Paraphrasing Form -->
+        <form id="paraphraseForm" action="/paraphrase" method="POST">
+            <div class="form-group">
+                <label for="paraphrase-text">Enter Text to Paraphrase:</label>
+                <textarea class="form-control" id="paraphrase-text" name="paraphrase-text" rows="6"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3 w-100">Paraphrase Text</button>
+        </form>
+
+        <!-- Display Plagiarism Results -->
+        {% if result %}
+        <div class="alert alert-success mt-3 output">
+            <strong>Plagiarism Results:</strong>
+            <p>{{ result }}</p>
+            {% if ai_generated is not none %}
+            <p><strong>AI Generated:</strong> {{ "Yes" if ai_generated else "No" }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Display Paraphrased Text -->
+        {% if paraphrased_texts %}
+        <div class="output">
+            <h3>Paraphrased Texts:</h3>
+            <ul>
+                {% for text in paraphrased_texts %}
+                <li>{{ text }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Display Errors -->
+        {% if error %}
+        <div class="alert alert-danger mt-3 output error">
+            <strong>Error:</strong> <p>{{ error }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const plagiarismForm = document.getElementById('plagiarismForm');
+        const paraphraseForm = document.getElementById('paraphraseForm');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingProgress = document.getElementById('loadingProgress');
+
+        // Function to simulate loading progress
+        function simulateProgress(callback) {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                loadingProgress.textContent = `Loading... ${progress}%`;
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    callback();
+                }
+            }, 300); // Update every 300ms
+        }
+
+        // Add event listener to plagiarism form
+        plagiarismForm.addEventListener('submit', function (e) {
+            e.preventDefault(); // Prevent default form submission
+            loadingOverlay.style.display = 'flex';
+            simulateProgress(() => {
+                plagiarismForm.submit(); // Submit the form once loading is complete
+            });
+        });
+
+        // Add event listener to paraphrase form
+        paraphraseForm.addEventListener('submit', function (e) {
+            e.preventDefault(); // Prevent default form submission
+            loadingOverlay.style.display = 'flex';
+            simulateProgress(() => {
+                paraphraseForm.submit(); // Submit the form once loading is complete
+            });
+        });
+    </script>
+</body>
+
+</html>
